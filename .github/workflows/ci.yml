@@ -1,0 +1,37 @@
+name: ✅ CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: [self-hosted, n100]
+    timeout-minutes: 15
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: ☕ Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: 🔨 Compile
+        run: mvn clean compile -q
+
+      - name: 📦 Package (skip Selenium tests — Chrome not available in CI)
+        run: mvn package -DskipTests -q
+
+      - name: 📤 Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: selenium-reporter-jar
+          path: target/selenium-reporter-*.jar
+          retention-days: 7

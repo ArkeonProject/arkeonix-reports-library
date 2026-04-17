@@ -1,0 +1,25 @@
+target/
+test-reports/
+*.class
+*.jar
+*.war
+.mvn/
+!.mvn/wrapper/maven-wrapper.jar
+!.mvn/wrapper/maven-wrapper.properties
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Skills (installed locally, not committed)
+.agents/
+.windsurf/
+.kilocode/
+.kiro/

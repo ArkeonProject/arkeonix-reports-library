@@ -1,0 +1,16 @@
+# Default owners for all files
+* @ArkeonProject/maintainers
+
+# CI/CD workflows require DevOps approval
+/.github/workflows/ @ArkeonProject/devops @daviilpzDev
+/.github/actions/   @ArkeonProject/devops @daviilpzDev
+
+# Core library source
+/src/main/java/com/empresa/reporter/ @ArkeonProject/maintainers @daviilpzDev
+
+# HTML report template — visual changes require design review
+/src/main/resources/templates/ @ArkeonProject/maintainers @daviilpzDev
+
+# Documentation
+/docs/ @ArkeonProject/maintainers @daviilpzDev
+/README.md @ArkeonProject/maintainers @daviilpzDev

@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title th:text="${report.projectName} + ' — Test Report'">Test Report</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"/>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <style>
+        /* ── Tokens ────────────────────────────────────────────────────────── */
+        [data-theme="dark"] {
+            --bg:          #040C1C;
+            --bg2:         #071525;
+            --bg3:         #0C1E36;
+            --bg4:         #112344;
+            --border:      #162D4A;
+            --border2:     #1E3A5F;
+            --text:        #DFF0FF;
+            --text2:       #5E88B0;
+            --text3:       #2E4F6E;
+            --passed:      #00D68F;
+            --passed-bg:   rgba(0,214,143,.08);
+            --passed-glow: 0 0 14px rgba(0,214,143,.25);
+            --failed:      #FF4561;
+            --failed-bg:   rgba(255,69,97,.08);
+            --failed-glow: 0 0 14px rgba(255,69,97,.25);
+            --skipped:     #FFAA00;
+            --skipped-bg:  rgba(255,170,0,.08);
+            --flaky:       #FF7733;
+            --flaky-bg:    rgba(255,119,51,.08);
+            --accent:      #00AAFF;
+            --accent-bg:   rgba(0,170,255,.08);
+            --accent-glow: 0 0 20px rgba(0,170,255,.2);
+            --dot:         rgba(255,255,255,.022);
+            --shadow:      0 2px 8px rgba(0,0,0,.6);
+            --shadow-lg:   0 12px 40px rgba(0,0,0,.8);
+            --card-grad:   linear-gradient(160deg, rgba(255,255,255,.025) 0%, transparent 60%);
+        }
+        [data-theme="light"] {
+            --bg:          #EEF3FB;
+            --bg2:         #FFFFFF;
+            --bg3:         #E4ECF7;
+            --bg4:         #D8E4F0;
+            --border:      #C2D0E4;
+            --border2:     #A8BACE;
+            --text:        #0B1728;
+            --text2:       #445D78;
+            --text3:       #8AA0B6;
+            --passed:      #009966;
+            --passed-bg:   rgba(0,153,102,.08);
+            --passed-glow: none;
+            --failed:      #D0213A;
+            --failed-bg:   rgba(208,33,58,.08);
+            --failed-glow: none;
+            --skipped:     #BB8800;
+            --skipped-bg:  rgba(187,136,0,.08);
+            --flaky:       #C85500;
+            --flaky-bg:    rgba(200,85,0,.08);
+            --accent:      #0077CC;
+            --accent-bg:   rgba(0,119,204,.08);
+            --accent-glow: none;
+            --dot:         rgba(0,0,0,.035);
+            --shadow:      0 1px 4px rgba(0,0,0,.1);
+            --shadow-lg:   0 8px 24px rgba(0,0,0,.1);
+            --card-grad:   none;
+        }
+
+        /* ── Reset ─────────────────────────────────────────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { font-size: 14px; }
+        body {
+            font-family: "Syne", system-ui, sans-serif;
+            background: var(--bg);
+            background-image: radial-gradient(circle, var(--dot) 1px, transparent 1px);
+            background-size: 26px 26px;
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.55;
+        }
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        /* ── CI bar ─────────────────────────────────────────────────────────── */
+        .ci-bar {
+            background: var(--bg2);
+            border-bottom: 1px solid var(--border);
+            padding: 7px 32px;
+            display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+            font-family: "JetBrains Mono", monospace;
+            font-size: 11px; color: var(--text2);
+        }
+        .ci-bar span { display: flex; align-items: center; gap: 5px; }
+        .ci-chip {
+            background: var(--bg3); border: 1px solid var(--border2);
+            padding: 1px 7px; border-radius: 4px; font-size: 10px;
+            color: var(--text);
+        }
+
+        /* ── Header ─────────────────────────────────────────────────────────── */
+        .header {
+            background: var(--bg2);
+            border-bottom: 1px solid var(--border);
+            padding: 18px 32px;
+            display: flex; align-items: center; justify-content: space-between; gap: 16px;
+            position: sticky; top: 0; z-index: 100;
+            box-shadow: var(--shadow);
+        }
+        .header::after {
+            content: '';
+            position: absolute; bottom: -1px; left: 0; right: 0; height: 1px;
+            background: linear-gradient(90deg, transparent 0%, var(--accent) 30%, var(--passed) 70%, transparent 100%);
+            opacity: .5;
+        }
+        .header-left { display: flex; align-items: center; gap: 14px; }
+        .logo {
+            width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+            background: linear-gradient(135deg, var(--accent) 0%, #0044AA 100%);
+            display: flex; align-items: center; justify-content: center;
+            font-family: "Syne", sans-serif; font-size: 17px; font-weight: 800; color: #fff;
+            box-shadow: var(--accent-glow);
+        }
+        .header-title { font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
+        .header-sub   { font-size: 12px; color: var(--text2); margin-top: 1px; font-weight: 400; }
+        .header-right { display: flex; align-items: center; gap: 10px; }
+        .header-meta  { display: flex; gap: 20px; font-size: 12px; color: var(--text2); font-family: "JetBrains Mono", monospace; }
+        .header-meta span { display: flex; align-items: center; gap: 5px; }
+        .theme-btn {
+            background: var(--bg3); border: 1px solid var(--border2);
+            color: var(--text); cursor: pointer; padding: 7px 11px; border-radius: 8px;
+            font-size: 14px; transition: background .15s, box-shadow .15s;
+        }
+        .theme-btn:hover { background: var(--bg4); box-shadow: var(--accent-glow); }
+
+        /* ── Layout ─────────────────────────────────────────────────────────── */
+        .container { max-width: 1320px; margin: 0 auto; padding: 32px 32px; }
+
+        /* ── Flaky alert ─────────────────────────────────────────────────────── */
+        .flaky-alert {
+            background: var(--flaky-bg); border: 1px solid rgba(255,119,51,.25);
+            border-radius: 10px; padding: 13px 20px; margin-bottom: 24px;
+            display: flex; align-items: center; gap: 10px;
+            font-size: 13px; color: var(--flaky); font-weight: 600;
+        }
+        .flaky-alert .fa-dim { font-weight: 400; color: var(--text2); font-size: 12px; }
+
+        /* ── Cards ───────────────────────────────────────────────────────────── */
+        .cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 28px; }
+        .card {
+            background: var(--bg2); border: 1px solid var(--border);
+            border-radius: 14px; padding: 22px 24px;
+            position: relative; overflow: hidden;
+            box-shadow: var(--shadow);
+            opacity: 0;
+            animation: cardIn .5s ease forwards;
+        }
+        .card::before {
+            content: '';
+            position: absolute; inset: 0;
+            background: var(--card-grad);
+            border-radius: inherit; pointer-events: none;
+        }
+        .card:nth-child(1) { animation-delay: .05s; }
+        .card:nth-child(2) { animation-delay: .10s; }
+        .card:nth-child(3) { animation-delay: .15s; }
+        .card:nth-child(4) { animation-delay: .20s; }
+        .card:nth-child(5) { animation-delay: .25s; }
+        @keyframes cardIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .card-accent-bar {
+            position: absolute; top: 0; left: 0; right: 0; height: 3px;
+            border-radius: 14px 14px 0 0;
+        }
+        .card--total   .card-accent-bar { background: var(--accent); }
+        .card--passed  .card-accent-bar { background: var(--passed); }
+        .card--failed  .card-accent-bar { background: var(--failed); }
+        .card--skipped .card-accent-bar { background: var(--skipped); }
+        .card--flaky   .card-accent-bar { background: var(--flaky); }
+        .card-label {
+            font-size: 10px; font-weight: 600; text-transform: uppercase;
+            letter-spacing: .1em; color: var(--text2); margin-bottom: 10px;
+            font-family: "JetBrains Mono", monospace;
+        }
+        .card-value {
+            font-size: 40px; font-weight: 800; line-height: 1;
+            font-family: "Syne", sans-serif;
+        }
+        .card-sub { font-size: 11px; color: var(--text3); margin-top: 7px; font-weight: 400; }
+        .card--total   .card-value { color: var(--accent); }
+        .card--passed  .card-value { color: var(--passed); }
+        .card--failed  .card-value { color: var(--failed); }
+        .card--skipped .card-value { color: var(--skipped); }
+        .card--flaky   .card-value { color: var(--flaky); }
+
+        /* ── Charts ─────────────────────────────────────────────────────────── */
+        .charts { display: grid; grid-template-columns: 280px 1fr 260px; gap: 14px; margin-bottom: 28px; }
+        .chart-card {
+            background: var(--bg2); border: 1px solid var(--border);
+            border-radius: 14px; padding: 24px; box-shadow: var(--shadow);
+            position: relative; overflow: hidden;
+        }
+        .chart-card::before {
+            content: ''; position: absolute; inset: 0;
+            background: var(--card-grad); pointer-events: none;
+        }
+        .chart-title {
+            font-family: "JetBrains Mono", monospace;
+            font-size: 10px; font-weight: 600; text-transform: uppercase;
+            letter-spacing: .1em; color: var(--text2); margin-bottom: 18px;
+        }
+        .donut-wrap { position: relative; max-width: 190px; margin: 0 auto; }
+        .bar-wrap    { position: relative; height: 195px; }
+        .trend-wrap  { position: relative; height: 195px; }
+        .no-history-msg {
+            text-align: center; padding-top: 50px;
+            font-size: 12px; color: var(--text3); font-family: "JetBrains Mono", monospace;
+            line-height: 1.8;
+        }
+
+        /* ── Section header ──────────────────────────────────────────────────── */
+        .section-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        .section-title { font-size: 15px; font-weight: 700; }
+        .section-count {
+            font-family: "JetBrains Mono", monospace;
+            font-size: 11px; color: var(--text2);
+            background: var(--bg3); border: 1px solid var(--border);
+            padding: 3px 10px; border-radius: 20px;
+        }
+
+        /* ── Table ───────────────────────────────────────────────────────────── */
+        .table-wrap {
+            background: var(--bg2); border: 1px solid var(--border);
+            border-radius: 14px; overflow: hidden; box-shadow: var(--shadow);
+        }
+        table { width: 100%; border-collapse: collapse; }
+        thead { background: var(--bg3); }
+        th {
+            padding: 11px 16px; text-align: left;
+            font-family: "JetBrains Mono", monospace;
+            font-size: 10px; font-weight: 600; text-transform: uppercase;
+            letter-spacing: .1em; color: var(--text2);
+            border-bottom: 1px solid var(--border); white-space: nowrap; user-select: none;
+        }
+        th.sortable { cursor: pointer; transition: color .15s; }
+        th.sortable:hover { color: var(--text); }
+        th .sort-arrow { margin-left: 4px; opacity: .35; }
+        td {
+            padding: 12px 16px; font-size: 13px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+        .test-row { cursor: default; transition: background .12s; }
+        .test-row.expandable { cursor: pointer; }
+        .test-row:hover { background: var(--bg3); }
+        .test-row td:first-child {
+            font-family: "JetBrains Mono", monospace;
+            color: var(--text3); font-size: 11px;
+        }
+        /* Left border indicator on failed rows */
+        .test-row.row-failed td:first-child {
+            box-shadow: inset 3px 0 0 var(--failed);
+        }
+        .test-row.row-passed td:first-child {
+            box-shadow: inset 3px 0 0 transparent;
+        }
+
+        /* ── Status badge ────────────────────────────────────────────────────── */
+        .badge {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 3px 10px; border-radius: 20px;
+            font-family: "JetBrains Mono", monospace;
+            font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em;
+        }
+        .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+        .badge-passed  {
+            background: var(--passed-bg); color: var(--passed);
+            box-shadow: var(--passed-glow);
+        }
+        .badge-passed::before  { background: var(--passed); }
+        .badge-failed  {
+            background: var(--failed-bg); color: var(--failed);
+            box-shadow: var(--failed-glow);
+        }
+        .badge-failed::before  { background: var(--failed); }
+        .badge-skipped { background: var(--skipped-bg); color: var(--skipped); }
+        .badge-skipped::before { background: var(--skipped); }
+        .badge-flaky {
+            background: var(--flaky-bg); color: var(--flaky);
+            font-size: 9px; padding: 2px 7px; margin-left: 5px;
+        }
+        .badge-flaky::before   { background: var(--flaky); }
+        .badge-retry {
+            background: var(--accent-bg); color: var(--accent);
+            font-size: 9px; padding: 2px 7px; margin-left: 5px;
+        }
+        .badge-retry::before   { background: var(--accent); }
+
+        /* ── Failure category ────────────────────────────────────────────────── */
+        .cat-badge {
+            font-family: "JetBrains Mono", monospace;
+            font-size: 9px; font-weight: 600; text-transform: uppercase;
+            padding: 2px 7px; border-radius: 4px; letter-spacing: .05em;
+            margin-left: 5px;
+        }
+        .cat-assertion { background: var(--failed-bg);  color: var(--failed); }
+        .cat-element   { background: var(--skipped-bg); color: var(--skipped); }
+        .cat-timeout   { background: var(--accent-bg);  color: var(--accent); }
+        .cat-stale     { background: rgba(94,136,176,.1); color: var(--text2); }
+        .cat-exception { background: var(--failed-bg);  color: var(--failed); }
+
+        /* ── Trend dots ──────────────────────────────────────────────────────── */
+        .trend-dots { display: inline-flex; gap: 4px; align-items: center; }
+        .trend-dot  { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+        .trend-dot.passed  { background: var(--passed); box-shadow: 0 0 4px rgba(0,214,143,.4); }
+        .trend-dot.failed  { background: var(--failed); box-shadow: 0 0 4px rgba(255,69,97,.4); }
+        .trend-dot.skipped { background: var(--skipped); }
+
+        /* ── Expand icon ─────────────────────────────────────────────────────── */
+        .expand-icon {
+            float: right; color: var(--text3); font-size: 10px;
+            margin-left: 8px; transition: transform .25s ease, color .15s;
+        }
+        .test-row:hover .expand-icon { color: var(--text2); }
+
+        /* ── Detail row ──────────────────────────────────────────────────────── */
+        .detail-row td {
+            padding: 0; background: var(--bg);
+            border-bottom: 2px solid var(--border);
+        }
+        .detail-row.open .detail-inner {
+            animation: detailIn .2s ease;
+        }
+        @keyframes detailIn {
+            from { opacity: 0; transform: translateY(-6px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .detail-inner { padding: 22px 28px; }
+        .detail-section { margin-bottom: 18px; }
+        .detail-section:last-child { margin-bottom: 0; }
+        .detail-label {
+            font-family: "JetBrains Mono", monospace;
+            font-size: 10px; font-weight: 600; text-transform: uppercase;
+            letter-spacing: .1em; color: var(--text2); margin-bottom: 10px;
+        }
+        .failure-header {
+            display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap;
+        }
+        .exception-type {
+            font-family: "JetBrains Mono", monospace;
+            font-size: 12px; font-weight: 600;
+            background: var(--failed-bg); color: var(--failed);
+            border: 1px solid rgba(255,69,97,.25);
+            padding: 3px 9px; border-radius: 5px; white-space: nowrap;
+        }
+        .failure-origin {
+            font-family: "JetBrains Mono", monospace;
+            font-size: 11px; color: var(--text3);
+        }
+        .exception-body {
+            background: var(--bg3); border: 1px solid var(--border2);
+            border-radius: 8px; padding: 12px 16px;
+            font-family: "JetBrains Mono", monospace;
+            font-size: 12px; color: var(--text);
+            overflow-x: auto; white-space: pre-wrap; word-break: break-word;
+            max-height: 120px; overflow-y: auto;
+        }
+        .stacktrace {
+            background: var(--bg3); border: 1px solid var(--border);
+            border-radius: 8px; padding: 16px;
+            font-family: "JetBrains Mono", monospace;
+            font-size: 11px; line-height: 1.7; color: var(--text2);
+            overflow-x: auto; white-space: pre; max-height: 280px; overflow-y: auto;
+        }
+        .screenshot {
+            max-width: 100%; border-radius: 8px;
+            border: 1px solid var(--border2); display: block;
+            box-shadow: var(--shadow);
+        }
+        .no-detail {
+            color: var(--text3); font-size: 13px; font-style: italic;
+            font-family: "JetBrains Mono", monospace; font-size: 12px;
+        }
+
+        /* ── Step log ────────────────────────────────────────────────────────── */
+        .step-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .step-table tr { transition: background .1s; }
+        .step-table tr:hover { background: var(--bg2); }
+        .step-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); }
+        .step-table tr:last-child td { border-bottom: none; }
+        .step-ts  { font-family: "JetBrains Mono", monospace; color: var(--text3); white-space: nowrap; font-size: 11px; }
+        .step-dur { font-family: "JetBrains Mono", monospace; color: var(--text3); white-space: nowrap; text-align: right; font-size: 11px; }
+        .step-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+        .step-dot.passed  { background: var(--passed); }
+        .step-dot.failed  { background: var(--failed); }
+        .step-dot.skipped { background: var(--skipped); }
+        .step-dot.pending { background: var(--skipped); }
+        .step-desc { color: var(--text); }
+
+        /* ── Footer ──────────────────────────────────────────────────────────── */
+        footer {
+            text-align: center; padding: 28px;
+            font-family: "JetBrains Mono", monospace;
+            font-size: 11px; color: var(--text3);
+            border-top: 1px solid var(--border); margin-top: 12px;
+            letter-spacing: .04em;
+        }
+
+        /* ── Responsive ──────────────────────────────────────────────────────── */
+        @media (max-width: 1100px) {
+            .charts { grid-template-columns: 260px 1fr; }
+            .charts .chart-card:last-child { grid-column: span 2; }
+        }
+        @media (max-width: 900px) {
+            .charts { grid-template-columns: 1fr; }
+            .cards  { grid-template-columns: repeat(3, 1fr); }
+            .container { padding: 16px; }
+            .header    { padding: 14px 16px; }
+            .ci-bar    { padding: 6px 16px; }
+        }
+        @media (max-width: 560px) {
+            .cards { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ── CI bar ───────────────────────────────────────────────────────────────── -->
+<div class="ci-bar" th:if="${report.buildInfo != null}">
+    <span>&#9881; <span th:text="${report.buildInfo.ciSystem}">Jenkins</span></span>
+    <span th:if="${report.buildInfo.buildNumber != null}">
+        build <span class="ci-chip" th:text="'#' + ${report.buildInfo.buildNumber}">#42</span>
+    </span>
+    <span th:if="${report.buildInfo.branch != null}">
+        &#10022; <span class="ci-chip" th:text="${report.buildInfo.branch}">main</span>
+    </span>
+    <span th:if="${report.buildInfo.commitSha != null}">
+        <span class="ci-chip" th:text="${report.buildInfo.commitSha}">abc1234</span>
+    </span>
+    <span th:if="${report.buildInfo.buildUrl != null}">
+        <a th:href="${report.buildInfo.buildUrl}" target="_blank">&#8599; view build</a>
+    </span>
+</div>
+
+<!-- ── Header ───────────────────────────────────────────────────────────────── -->
+<header class="header">
+    <div class="header-left">
+        <div class="logo">S</div>
+        <div>
+            <div class="header-title" th:text="${report.projectName}">Project Name</div>
+            <div class="header-sub"   th:text="${report.suiteName}">Suite Name</div>
+        </div>
+    </div>
+    <div class="header-right">
+        <div class="header-meta">
+            <span>&#9783; <span th:text="${report.formattedStartTime}">2026-01-01</span></span>
+            <span>&#9711; <span th:text="${report.formattedTotalDuration}">0ms</span></span>
+            <span>&#9635; <span th:text="${report.environment}">OS / Java</span></span>
+        </div>
+        <button class="theme-btn" onclick="toggleTheme()" title="Toggle theme">&#9681;</button>
+    </div>
+</header>
+
+<!-- ── Main ─────────────────────────────────────────────────────────────────── -->
+<div class="container">
+
+    <!-- Flaky alert -->
+    <div class="flaky-alert" th:if="${report.flakyCount > 0}">
+        &#9888;
+        <span th:text="${report.flakyCount} + ' flaky test' + (${report.flakyCount} == 1 ? '' : 's') + ' detected'">
+            2 flaky tests detected
+        </span>
+        <span class="fa-dim">— inconsistent results across recent runs</span>
+    </div>
+
+    <!-- Summary cards -->
+    <div class="cards">
+        <div class="card card--total">
+            <div class="card-accent-bar"></div>
+            <div class="card-label">Total</div>
+            <div class="card-value counter" th:attr="data-target=${report.total}" th:text="${report.total}">0</div>
+            <div class="card-sub">test cases</div>
+        </div>
+        <div class="card card--passed">
+            <div class="card-accent-bar"></div>
+            <div class="card-label">Passed</div>
+            <div class="card-value counter" th:attr="data-target=${report.passed}" th:text="${report.passed}">0</div>
+            <div class="card-sub" th:text="${report.passRate} + ' pass rate'">0.0% pass rate</div>
+        </div>
+        <div class="card card--failed">
+            <div class="card-accent-bar"></div>
+            <div class="card-label">Failed</div>
+            <div class="card-value counter" th:attr="data-target=${report.failed}" th:text="${report.failed}">0</div>
+            <div class="card-sub">require attention</div>
+        </div>
+        <div class="card card--skipped">
+            <div class="card-accent-bar"></div>
+            <div class="card-label">Skipped</div>
+            <div class="card-value counter" th:attr="data-target=${report.skipped}" th:text="${report.skipped}">0</div>
+            <div class="card-sub">not executed</div>
+        </div>
+        <div class="card card--flaky">
+            <div class="card-accent-bar"></div>
+            <div class="card-label">Flaky</div>
+            <div class="card-value counter" th:attr="data-target=${report.flakyCount}" th:text="${report.flakyCount}">0</div>
+            <div class="card-sub">inconsistent</div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts">
+        <div class="chart-card">
+            <div class="chart-title">Results breakdown</div>
+            <div class="donut-wrap"><canvas id="donutChart" height="190"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-title">Duration per test (ms)</div>
+            <div class="bar-wrap"><canvas id="barChart"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-title">Pass rate trend</div>
+            <div class="trend-wrap"><canvas id="trendChart"></canvas></div>
+            <div th:if="${#lists.isEmpty(report.history)}" class="no-history-msg">
+                No history yet.<br/>Trend appears after<br/>the second run.
+            </div>
+        </div>
+    </div>
+
+    <!-- Tests table -->
+    <div class="section-header">
+        <span class="section-title">Test Results</span>
+        <span class="section-count" th:text="${report.total} + ' tests'">0 tests</span>
+    </div>
+    <div class="table-wrap">
+        <table id="testsTable">
+            <thead>
+                <tr>
+                    <th style="width:44px">#</th>
+                    <th class="sortable" onclick="sortTable(1)">Test Name <span class="sort-arrow">&#8597;</span></th>
+                    <th class="sortable" onclick="sortTable(2)">Class <span class="sort-arrow">&#8597;</span></th>
+                    <th class="sortable" onclick="sortTable(3)">Status <span class="sort-arrow">&#8597;</span></th>
+                    <th class="sortable" onclick="sortTable(4)" style="width:100px">Duration <span class="sort-arrow">&#8597;</span></th>
+                    <th style="width:80px">History</th>
+                    <th style="width:140px">Browser</th>
+                    <th style="width:80px">Time</th>
+                </tr>
+            </thead>
+            <tbody id="testsTbody">
+                <th:block th:each="test,s : ${report.testCases}">
+                    <!-- Main row -->
+                    <tr class="test-row expandable"
+                        th:classappend="${test.status.name() == 'FAILED'} ? 'row-failed' : 'row-passed'"
+                        th:attr="data-idx=${s.index}"
+                        th:onclick="'toggleDetail(' + ${s.index} + ')'">
+                        <td th:text="${s.count}">1</td>
+                        <td>
+                            <span th:text="${test.testName}">testName</span>
+                            <span class="badge badge-flaky" th:if="${test.flaky}">FLAKY</span>
+                            <span class="badge badge-retry"
+                                  th:if="${test.retryCount > 0}"
+                                  th:text="'retry&#xD7;' + ${test.retryCount}">retry&#xD7;1</span>
+                            <span class="expand-icon">&#9660;</span>
+                        </td>
+                        <td th:text="${test.simpleClassName}">ClassName</td>
+                        <td>
+                            <span class="badge"
+                                  th:classappend="'badge-' + ${test.status.name().toLowerCase()}"
+                                  th:text="${test.status}">PASSED</span>
+                            <span class="cat-badge"
+                                  th:if="${test.failureCategory != null}"
+                                  th:classappend="${test.failureCategory.cssClass}"
+                                  th:text="${test.failureCategory.label}">Assertion</span>
+                        </td>
+                        <td th:text="${test.formattedDuration}"
+                            th:attr="data-sort=${test.durationMs}">0ms</td>
+                        <td>
+                            <span class="trend-dots" th:if="${not #lists.isEmpty(test.recentOutcomes)}">
+                                <th:block th:each="outcome : ${test.recentOutcomes}">
+                                    <span class="trend-dot" th:classappend="${outcome.toLowerCase()}"></span>
+                                </th:block>
+                            </span>
+                            <span th:if="${#lists.isEmpty(test.recentOutcomes)}"
+                                  style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:11px;">—</span>
+                        </td>
+                        <td th:text="${test.browserInfo != null ? test.browserInfo : '—'}"
+                            style="font-family:'JetBrains Mono',monospace;font-size:11px;">Chrome</td>
+                        <td th:text="${test.formattedStartTime}"
+                            style="font-family:'JetBrains Mono',monospace;font-size:11px;">00:00:00</td>
+                    </tr>
+                    <!-- Detail row -->
+                    <tr class="detail-row"
+                        th:id="'detail-' + ${s.index}"
+                        style="display:none">
+                        <td colspan="8">
+                            <div class="detail-inner">
+                                <!-- Failure info -->
+                                <div class="detail-section"
+                                     th:if="${test.exceptionType != null or test.exceptionMessage != null}">
+                                    <div class="detail-label">Failure</div>
+                                    <div class="failure-header">
+                                        <span class="exception-type"
+                                              th:if="${test.exceptionType != null}"
+                                              th:text="${test.exceptionType}">AssertionError</span>
+                                        <span class="cat-badge"
+                                              th:if="${test.failureCategory != null}"
+                                              th:classappend="${test.failureCategory.cssClass}"
+                                              th:text="${test.failureCategory.label}">Assertion</span>
+                                        <span class="failure-origin"
+                                              th:if="${test.failureOrigin != null}"
+                                              th:text="${test.failureOrigin}">StepDefs.step(StepDefs.java:42)</span>
+                                    </div>
+                                    <pre class="exception-body"
+                                         th:if="${test.exceptionMessage != null}"
+                                         th:text="${test.exceptionMessage}"></pre>
+                                </div>
+                                <!-- Step log -->
+                                <div class="detail-section" th:if="${test.hasSteps()}">
+                                    <div class="detail-label">
+                                        Steps (<span th:text="${#lists.size(test.steps)}">0</span>)
+                                    </div>
+                                    <table class="step-table">
+                                        <th:block th:each="step : ${test.steps}">
+                                            <tr>
+                                                <td class="step-ts"
+                                                    th:text="${step.formattedTimestamp}">00:00:00.000</td>
+                                                <td style="width:18px;padding:6px 7px;">
+                                                    <span class="step-dot"
+                                                          th:classappend="${step.cssClass}"></span>
+                                                </td>
+                                                <td class="step-desc"
+                                                    th:text="${step.description}">Given I open the page</td>
+                                                <td class="step-dur"
+                                                    th:text="${step.formattedDuration}">12ms</td>
+                                            </tr>
+                                        </th:block>
+                                    </table>
+                                </div>
+                                <!-- Stack trace -->
+                                <div class="detail-section" th:if="${test.stackTrace != null}">
+                                    <div class="detail-label">Stack Trace</div>
+                                    <pre class="stacktrace" th:text="${test.stackTrace}"></pre>
+                                </div>
+                                <!-- Screenshot -->
+                                <div class="detail-section" th:if="${test.screenshotBase64 != null}">
+                                    <div class="detail-label">Screenshot</div>
+                                    <img class="screenshot"
+                                         th:src="'data:image/png;base64,' + ${test.screenshotBase64}"
+                                         alt="Test screenshot"/>
+                                </div>
+                                <!-- Fallback -->
+                                <div class="no-detail"
+                                     th:if="${test.exceptionType == null and test.exceptionMessage == null
+                                             and test.stackTrace == null and test.screenshotBase64 == null
+                                             and not test.hasSteps()}">
+                                    // no additional details for this test
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </th:block>
+                <!-- Empty state -->
+                <tr th:if="${report.total == 0}">
+                    <td colspan="8"
+                        style="text-align:center;padding:48px;color:var(--text3);
+                               font-family:'JetBrains Mono',monospace;font-size:12px;">
+                        // no test results found
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<footer>
+    selenium-reporter &nbsp;&#183;&nbsp; generated
+    <span th:text="${report.formattedStartTime}">2026-01-01</span>
+</footer>
+
+<!-- ── Thymeleaf → JS data bridge ──────────────────────────────────────────── -->
+<script th:inline="javascript">
+/*<![CDATA[*/
+var _passed        = /*[[${report.passed}]]*/ 0;
+var _failed        = /*[[${report.failed}]]*/ 0;
+var _skipped       = /*[[${report.skipped}]]*/ 0;
+var _labels        = /*[[${testLabels}]]*/    [];
+var _durations     = /*[[${testDurations}]]*/ [];
+var _statuses      = /*[[${testStatuses}]]*/  [];
+var _histLabels    = /*[[${historyLabels}]]*/    [];
+var _histPassRates = /*[[${historyPassRates}]]*/ [];
+/*]]>*/
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<!-- ── Charts ──────────────────────────────────────────────────────────────── -->
+<script>
+(function () {
+    var dark      = document.documentElement.getAttribute('data-theme') !== 'light';
+    var textClr   = dark ? '#5E88B0' : '#445D78';
+    var gridClr   = dark ? '#0C1E36' : '#E4ECF7';
+    var passClr   = dark ? '#00D68F' : '#009966';
+    var failClr   = dark ? '#FF4561' : '#D0213A';
+    var skipClr   = dark ? '#FFAA00' : '#BB8800';
+    var borderClr = dark ? '#071525' : '#FFFFFF';
+
+    // Donut
+    new Chart(document.getElementById('donutChart'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Passed', 'Failed', 'Skipped'],
+            datasets: [{
+                data: [_passed, _failed, _skipped],
+                backgroundColor: [passClr, failClr, skipClr],
+                borderColor: borderClr, borderWidth: 3, hoverOffset: 8
+            }]
+        },
+        options: {
+            cutout: '70%',
+            plugins: {
+                legend: { position: 'bottom', labels: { color: textClr, padding: 16, font: { size: 11, family: "'JetBrains Mono'" } } },
+                tooltip: { callbacks: { label: function(c) {
+                    var t = c.dataset.data.reduce(function(a,b){return a+b;},0);
+                    return ' ' + c.label + ': ' + c.parsed + ' (' + (t ? Math.round(c.parsed/t*100) : 0) + '%)';
+                }}}
+            }
+        }
+    });
+
+    // Bar
+    var barClrs = _statuses.map(function(s){return s==='PASSED'?passClr:s==='FAILED'?failClr:skipClr;});
+    new Chart(document.getElementById('barChart'), {
+        type: 'bar',
+        data: {
+            labels: _labels.map(function(l){return l.length>20?l.slice(0,17)+'…':l;}),
+            datasets: [{ label: 'ms', data: _durations, backgroundColor: barClrs, borderRadius: 4, borderSkipped: false }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { ticks: { color: textClr, font: { size: 10, family: "'JetBrains Mono'" } }, grid: { color: gridClr } },
+                y: { ticks: { color: textClr, font: { size: 10, family: "'JetBrains Mono'" } }, grid: { color: gridClr },
+                     title: { display: true, text: 'ms', color: textClr, font: { family: "'JetBrains Mono'", size: 10 } } }
+            }
+        }
+    });
+
+    // Trend
+    if (_histLabels.length > 0) {
+        new Chart(document.getElementById('trendChart'), {
+            type: 'line',
+            data: {
+                labels: _histLabels,
+                datasets: [{
+                    label: 'Pass rate %', data: _histPassRates,
+                    borderColor: passClr,
+                    backgroundColor: dark ? 'rgba(0,214,143,.06)' : 'rgba(0,153,102,.06)',
+                    borderWidth: 2, tension: .35, fill: true, pointRadius: 4,
+                    pointBackgroundColor: _histPassRates.map(function(v){return v>=100?passClr:v>0?skipClr:failClr;})
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: function(c){ return ' ' + c.parsed.y.toFixed(1) + '%'; } } }
+                },
+                scales: {
+                    x: { ticks: { color: textClr, font: { size: 9, family: "'JetBrains Mono'" }, maxRotation: 45 }, grid: { color: gridClr } },
+                    y: { min: 0, max: 100,
+                         ticks: { color: textClr, font: { size: 9, family: "'JetBrains Mono'" }, callback: function(v){ return v + '%'; } },
+                         grid: { color: gridClr } }
+                }
+            }
+        });
+    }
+})();
+</script>
+
+<!-- ── Interactions ─────────────────────────────────────────────────────────── -->
+<script>
+/* Theme */
+function toggleTheme() {
+    var el   = document.documentElement;
+    var next = el.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    el.setAttribute('data-theme', next);
+    try { localStorage.setItem('srTheme', next); } catch(e) {}
+}
+(function(){
+    try { var s = localStorage.getItem('srTheme'); if (s) document.documentElement.setAttribute('data-theme', s); } catch(e) {}
+})();
+
+/* Counter animation */
+(function(){
+    document.querySelectorAll('.counter').forEach(function(el) {
+        var target = parseInt(el.getAttribute('data-target'), 10) || 0;
+        if (target === 0) return;
+        var start = null;
+        var dur   = 700;
+        function step(ts) {
+            if (!start) start = ts;
+            var p = Math.min((ts - start) / dur, 1);
+            var ease = 1 - Math.pow(1 - p, 3);
+            el.textContent = Math.round(target * ease);
+            if (p < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+    });
+})();
+
+/* Expand / collapse */
+function toggleDetail(idx) {
+    var row = document.getElementById('detail-' + idx);
+    if (!row) return;
+    var hidden = row.style.display === 'none' || row.style.display === '';
+    row.style.display = hidden ? 'table-row' : 'none';
+    if (hidden) {
+        row.classList.remove('open');
+        void row.offsetHeight;
+        row.classList.add('open');
+    }
+}
+
+/* Sort */
+var _sd = {};
+function sortTable(col) {
+    document.querySelectorAll('.detail-row').forEach(function(r){ r.style.display = 'none'; });
+    _sd[col] = !_sd[col];
+    var asc   = _sd[col];
+    var tbody = document.getElementById('testsTbody');
+    var rows  = Array.from(tbody.querySelectorAll('tr.test-row'));
+    rows.sort(function(a, b) {
+        var av = (a.cells[col].getAttribute('data-sort') || a.cells[col].innerText || '').trim();
+        var bv = (b.cells[col].getAttribute('data-sort') || b.cells[col].innerText || '').trim();
+        var an = parseFloat(av), bn = parseFloat(bv);
+        if (!isNaN(an) && !isNaN(bn)) return asc ? an - bn : bn - an;
+        return asc ? av.localeCompare(bv) : bv.localeCompare(av);
+    });
+    rows.forEach(function(row) {
+        var idx    = row.getAttribute('data-idx');
+        var detail = document.getElementById('detail-' + idx);
+        tbody.appendChild(row);
+        if (detail) tbody.appendChild(detail);
+    });
+}
+</script>
+</body>
+</html>

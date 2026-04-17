@@ -1,0 +1,192 @@
+name: 🚀 Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      version-bump:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: minor
+
+jobs:
+  # ── Triggered manually: bump version and open PR to main ─────────────────────
+  prepare-release:
+    name: 📦 Prepare Release
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: [self-hosted, n100]
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: 📥 Checkout develop
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: ☕ Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: ⚙️ Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: 📌 Get current version
+        id: current
+        run: |
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: 🔢 Calculate new version
+        id: bump
+        run: |
+          CURRENT="${{ steps.current.outputs.version }}"
+          # Strip -SNAPSHOT if present
+          CURRENT="${CURRENT%-SNAPSHOT}"
+          IFS='.' read -ra V <<< "$CURRENT"
+          MAJOR="${V[0]}"; MINOR="${V[1]}"; PATCH="${V[2]}"
+          case "${{ inputs.version-bump }}" in
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH + 1)) ;;
+          esac
+          echo "version=${MAJOR}.${MINOR}.${PATCH}" >> $GITHUB_OUTPUT
+
+      - name: 🌿 Create release branch
+        id: branch
+        run: |
+          BRANCH="release/v${{ steps.bump.outputs.version }}"
+          git checkout -b "$BRANCH"
+          echo "name=$BRANCH" >> $GITHUB_OUTPUT
+
+      - name: 📝 Bump version in pom.xml
+        run: |
+          mvn versions:set -DnewVersion=${{ steps.bump.outputs.version }} -DgenerateBackupPoms=false -q
+          git add pom.xml
+
+      - name: 💾 Commit and push
+        run: |
+          git commit -m "chore(release): bump version to ${{ steps.bump.outputs.version }}"
+          git push origin ${{ steps.branch.outputs.name }}
+
+      - name: 🔀 Open PR to main
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Release v${{ steps.bump.outputs.version }}`,
+              head: '${{ steps.branch.outputs.name }}',
+              base: 'main',
+              body: `## 📦 Release v${{ steps.bump.outputs.version }}\n\n### Checklist\n- [ ] CI passes\n- [ ] Changelog reviewed\n- [ ] QA approved`
+            });
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              labels: ['release']
+            });
+
+  # ── Triggered on merge to main: tag, publish GitHub Release, back-merge ──────
+  publish-release:
+    name: 🎉 Publish Release
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: [self-hosted, n100]
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: 📥 Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: ☕ Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: ⚙️ Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: 📌 Get version from pom.xml
+        id: version
+        run: |
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+
+      - name: 🔨 Build JAR
+        run: mvn clean package -DskipTests -q
+
+      - name: 🏷️ Create and push tag
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists, skipping"
+          else
+            git tag -a "$TAG" -m "Release $TAG"
+            git push origin "$TAG"
+          fi
+
+      - name: 🎉 Create GitHub Release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const tag = '${{ steps.version.outputs.tag }}';
+            const version = '${{ steps.version.outputs.version }}';
+
+            const { data: release } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              name: `selenium-reporter ${tag}`,
+              body: `## selenium-reporter ${tag}\n\nSee [CHANGELOG.md](CHANGELOG.md) for details.`,
+              draft: false,
+              prerelease: false
+            });
+
+            // Attach the JAR
+            const jarPath = `target/selenium-reporter-${version}.jar`;
+            if (fs.existsSync(jarPath)) {
+              await github.rest.repos.uploadReleaseAsset({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: release.id,
+                name: `selenium-reporter-${version}.jar`,
+                data: fs.readFileSync(jarPath)
+              });
+            }
+
+      - name: 🔄 Back-merge main → develop
+        run: |
+          git fetch origin
+          git checkout develop
+          git merge origin/main --no-ff -m "chore: back-merge ${{ steps.version.outputs.tag }} to develop"
+          git push origin develop
+        continue-on-error: true
