@@ -12,6 +12,13 @@
     <name>Selenium Reporter</name>
     <description>Automatic HTML report generator for Selenium WebDriver tests (TestNG + JUnit 5)</description>
 
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <url>https://maven.pkg.github.com/ArkeonProject/arkeonix-reports-library</url>
+        </repository>
+    </distributionManagement>
+
     <properties>
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>

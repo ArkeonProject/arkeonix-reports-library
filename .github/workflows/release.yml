@@ -117,6 +117,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      packages: write
 
     steps:
       - name: 📥 Checkout main
@@ -132,6 +133,9 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           cache: maven
+          server-id: github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
 
       - name: 📦 Ensure Maven is available
         run: |
@@ -153,6 +157,11 @@ jobs:
 
       - name: 🔨 Build JAR
         run: mvn clean package -DskipTests -q
+
+      - name: 🚀 Publish to GitHub Packages
+        run: mvn deploy -DskipTests -q
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 🏷️ Create and push tag
         run: |
