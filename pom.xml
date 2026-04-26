@@ -6,11 +6,18 @@
 
     <groupId>com.empresa</groupId>
     <artifactId>selenium-reporter</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
     <packaging>jar</packaging>
 
     <name>Selenium Reporter</name>
     <description>Automatic HTML report generator for Selenium WebDriver tests (TestNG + JUnit 5)</description>
+
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <url>https://maven.pkg.github.com/ArkeonProject/arkeonix-reports-library</url>
+        </repository>
+    </distributionManagement>
 
     <properties>
         <maven.compiler.source>11</maven.compiler.source>
